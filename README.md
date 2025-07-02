@@ -2,6 +2,8 @@
 
 A comprehensive error reporting system for Zig that provides rich, colorful diagnostic output similar to modern compilers like Rust's `rustc` and Zig's own compiler.
 
+✅ Works with Zig **0.14.x**
+
 ## Features
 
 - 🎨 **Colorful Output**: ANSI color-coded diagnostics with severity-based coloring
