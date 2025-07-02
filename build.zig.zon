@@ -1,0 +1,14 @@
+.{
+    .name = .fehler,
+    .version = "0.1.0",
+    .fingerprint = 0x2763d78399d579f0,
+    .minimum_zig_version = "0.14.1",
+    .dependencies = .{},
+    .paths = .{
+        "build.zig",
+        "build.zig.zon",
+        "src",
+        "LICENSE",
+        "README.md",
+    },
+}
