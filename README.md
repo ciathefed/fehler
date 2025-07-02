@@ -2,6 +2,8 @@
 
 A comprehensive error reporting system for Zig that provides rich, colorful diagnostic output similar to modern compilers like Rust's `rustc` and Zig's own compiler.
 
+![tests](https://img.shields.io/github/actions/workflow/status/ciathefed/fehler/zig.yml?label=tests%20%F0%9F%A7%AA&style=flat-square)
+
 ✅ Works with Zig **0.14.x**
 
 ## Features
@@ -12,6 +14,24 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 - 🔧 **Help Messages**: Optional help text for guiding users to solutions
 - 🏗️ **Fluent Interface**: Builder pattern for easy diagnostic construction
 - 🧠 **Memory Safe**: Proper memory management with allocator-based design
+
+## Install
+
+Run this command in the root of your Zig project:
+
+```shell
+zig fetch --save "git+https://github.com/ciathefed/fehler"
+```
+
+Add this snippet to your `build.zig`:
+
+```zig
+const fehler = b.dependency("fehler", .{
+    .target = target,
+    .optimize = optimize,
+});
+exe_mod.addImport("fehler", fehler.module("fehler"));
+```
 
 ## Quick Start
 
@@ -159,3 +179,26 @@ const diag = createDiagnostic(
 // Diagnostic.init(.err, "syntax error")
 //     .withLocation(SourceLoc{ .file = "parser.zig", .line = 25, .column = 8 })
 ```
+
+## Contributing
+
+Contributions are welcome. If you find a bug or want to add a feature, open an issue or pull request.
+
+To contribute code:
+
+1. Fork the repository
+2. Create a new branch
+3. Make your changes
+4. Open a pull request with a clear description
+
+Please follow the [Conventional Commits](https://www.conventionalcommits.org/) format for commit messages. Examples:
+
+- `fix: handle empty source input in reporter`
+- `feat: add support for multiple source files`
+- `refactor: simplify diagnostic builder`
+
+Keep changes focused and minimal. Include tests when appropriate.
+
+## License
+
+This project is licensed under the [MIT License](./LICENSE)
