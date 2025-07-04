@@ -78,17 +78,7 @@ pub fn main() !void {
 
 The above code produces output like this:
 
-```
-error: type mismatch: cannot add integer and string
-  example.zig:5:15
-     3 | pub fn main() void {
-     4 |     const x = 42;
-     5 |     const y = x + "hello"; // Error here!
-                       ^
-     6 |     std.debug.print("Result: {}\n", .{y});
-     7 | }
-  help: consider converting the string to an integer using std.fmt.parseInt()
-```
+![Example](./assets/example.png)
 
 ## API Reference
 
