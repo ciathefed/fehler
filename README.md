@@ -68,7 +68,9 @@ pub fn main() !void {
             .line = 5,
             .column = 15,
         })
-        .withHelp("consider converting the string to an integer using std.fmt.parseInt()");
+        .withHelp("consider converting the string to an integer using std.fmt.parseInt()")
+        .withCode("E0001")
+        .withUrl("https://docs.example.org/errors/E0001");
 
     reporter.report(diagnostic);
 }
@@ -126,10 +128,21 @@ const diag_with_loc = Diagnostic.init(.err, "undefined variable 'foo'")
 const diag_with_help = Diagnostic.init(.warn, "unused variable 'bar'")
     .withHelp("prefix with '_' to silence this warning");
 
-// Chained (fluent interface)
+// With error code
+const diag_with_code = Diagnostic.init(.err, "syntax error")
+    .withCode("E0001");
+
+// With documentation URL
+const diag_with_url = Diagnostic.init(.err, "syntax error")
+    .withUrl("https://docs.example.org/errors/E0001");
+
+// Chained (fluent interface) with location, help, code, and URL
 const full_diag = Diagnostic.init(.err, "parse error")
     .withLocation(location)
-    .withHelp("expected ';' after expression");
+    .withHelp("expected ';' after expression")
+    .withCode("E2002")
+    .withUrl("https://docs.example.org/errors/E2002");
+
 ```
 
 #### `ErrorReporter`
