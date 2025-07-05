@@ -8,8 +8,9 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 ## Features
 
 - 🎨 **Colorful Output**: ANSI color-coded diagnostics with severity-based coloring
-- 📍 **Source Location**: Precise file, line, and column error reporting
+- 📍 **Range-Based Highlighting**: Precise source range highlighting with start and end positions
 - 📝 **Source Context**: Displays source code snippets with error highlighting
+- 🎯 **Smart Underlining**: Uses carets (`^`) for single characters and tildes (`~`) for ranges
 - 🔧 **Help Messages**: Optional help text for guiding users to solutions
 - 🏗️ **Fluent Interface**: Builder pattern for easy diagnostic construction
 - 🧠 **Memory Safe**: Proper memory management with allocator-based design
@@ -45,6 +46,7 @@ const std = @import("std");
 const ErrorReporter = @import("fehler").ErrorReporter;
 const Diagnostic = @import("fehler").Diagnostic;
 const Severity = @import("fehler").Severity;
+const SourceRange = @import("fehler").SourceRange;
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -67,13 +69,9 @@ pub fn main() !void {
 
     try reporter.addSource("example.zig", source);
 
-    // Create and report diagnostic
+    // Create diagnostic with range highlighting
     const diagnostic = Diagnostic.init(.err, "type mismatch: cannot add integer and string")
-        .withLocation(.{
-            .file = "example.zig",
-            .line = 5,
-            .column = 15,
-        })
+        .withRange(SourceRange.span("example.zig", 5, 15, 5, 23))
         .withHelp("consider converting the string to an integer using std.fmt.parseInt()")
         .withCode("E0001")
         .withUrl("https://docs.example.org/errors/E0001");
@@ -104,15 +102,33 @@ const color = severity.color();  // Returns ANSI color code
 const label = severity.label();  // Returns "error", "warning", or "note"
 ```
 
-#### `SourceLoc`
-Represents a location in source code:
+#### `Position`
+Represents a position in source code:
 
 ```zig
-const location = SourceLoc{
-    .file = "main.zig",
+const position = Position{
     .line = 42,
     .column = 10,
 };
+```
+
+#### `SourceRange`
+Represents a range in source code with start and end positions:
+
+```zig
+// Single character range
+const single_char = SourceRange.single("main.zig", 42, 10);
+
+// Multi-character range on same line
+const same_line = SourceRange.span("main.zig", 42, 10, 42, 20);
+
+// Multi-line range
+const multi_line = SourceRange.span("main.zig", 42, 10, 45, 5);
+
+// Check range properties
+const is_single = range.isSingleChar();    // true for single character
+const is_multiline = range.isMultiline();  // true for multi-line ranges
+const length = range.length();             // length for single-line ranges
 ```
 
 #### `Diagnostic`
@@ -122,13 +138,13 @@ The main diagnostic message structure:
 // Basic diagnostic
 const diag = Diagnostic.init(.err, "undefined variable 'foo'");
 
-// With location
+// With single character location (backward compatible)
 const diag_with_loc = Diagnostic.init(.err, "undefined variable 'foo'")
-    .withLocation(SourceLoc{
-        .file = "main.zig",
-        .line = 10,
-        .column = 5
-    });
+    .withLocation("main.zig", 10, 5);
+
+// With range highlighting
+const diag_with_range = Diagnostic.init(.err, "type mismatch")
+    .withRange(SourceRange.span("main.zig", 10, 5, 10, 15));
 
 // With help text
 const diag_with_help = Diagnostic.init(.warn, "unused variable 'bar'")
@@ -142,13 +158,12 @@ const diag_with_code = Diagnostic.init(.err, "syntax error")
 const diag_with_url = Diagnostic.init(.err, "syntax error")
     .withUrl("https://docs.example.org/errors/E0001");
 
-// Chained (fluent interface) with location, help, code, and URL
+// Chained (fluent interface) with range, help, code, and URL
 const full_diag = Diagnostic.init(.err, "parse error")
-    .withLocation(location)
+    .withRange(SourceRange.span("parser.zig", 25, 8, 25, 12))
     .withHelp("expected ';' after expression")
     .withCode("E2002")
     .withUrl("https://docs.example.org/errors/E2002");
-
 ```
 
 #### `ErrorReporter`
@@ -173,7 +188,7 @@ reporter.reportMany(&diagnostics);
 ### Convenience Functions
 
 #### `createDiagnostic`
-Shorthand for creating diagnostics with location:
+Shorthand for creating diagnostics with single-character location:
 
 ```zig
 const diag = createDiagnostic(
@@ -185,7 +200,73 @@ const diag = createDiagnostic(
 );
 // Equivalent to:
 // Diagnostic.init(.err, "syntax error")
-//     .withLocation(SourceLoc{ .file = "parser.zig", .line = 25, .column = 8 })
+//     .withLocation("parser.zig", 25, 8)
+```
+
+#### `createDiagnosticRange`
+Shorthand for creating diagnostics with range highlighting:
+
+```zig
+const diag = createDiagnosticRange(
+    .warn,
+    "long variable name",
+    "main.zig",
+    15, 8,    // start line, start column
+    15, 25    // end line, end column
+);
+// Equivalent to:
+// Diagnostic.init(.warn, "long variable name")
+//     .withRange(SourceRange.span("main.zig", 15, 8, 15, 25))
+```
+
+## Highlighting Examples
+
+The diagnostic system uses different visual indicators based on the range:
+
+### Single Character (Caret `^`)
+```
+   5 |     const y = x + "hello";
+     |               ^
+```
+
+### Single Line Range (Tildes `~`)
+```
+   5 |     const very_long_variable_name = 42;
+     |           ~~~~~~~~~~~~~~~~~~~~~~~
+```
+
+### Multi-line Range (Tildes `~`)
+```
+   5 |     const result = calculate(
+     |                    ~~~~~~~~~
+   6 |         param1,
+     | ~~~~~~~~~~~~~~~
+   7 |         param2
+     | ~~~~~~~~~~~~~~
+   8 |     );
+     | ~~~~~
+```
+
+## Migration from v0.1.0
+
+The new version maintains backward compatibility while adding range support:
+
+```zig
+// Old way (still works)
+const diag = Diagnostic.init(.err, "error message")
+    .withLocation(SourceLoc{
+        .file = "main.zig",
+        .line = 10,
+        .column = 5,
+    });
+
+// New way (recommended)
+const diag = Diagnostic.init(.err, "error message")
+    .withLocation("main.zig", 10, 5);  // Single character
+
+// Or with ranges
+const diag = Diagnostic.init(.err, "error message")
+    .withRange(SourceRange.span("main.zig", 10, 5, 10, 15));
 ```
 
 ## Contributing
@@ -202,7 +283,7 @@ To contribute code:
 Please follow the [Conventional Commits](https://www.conventionalcommits.org/) format for commit messages. Examples:
 
 - `fix: handle empty source input in reporter`
-- `feat: add support for multiple source files`
+- `feat: add support for range-based highlighting`
 - `refactor: simplify diagnostic builder`
 
 Keep changes focused and minimal. Include tests when appropriate.
