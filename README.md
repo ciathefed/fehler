@@ -16,10 +16,16 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 
 ## Install
 
-Run this command in the root of your Zig project:
+### Latest Release (recommended)
 
 ```shell
-zig fetch --save "git+https://github.com/ciathefed/fehler"
+zig fetch --save "git+https://github.com/ciathefed/fehler#v0.1.0"
+```
+
+### Latest on `main` (bleeding edge)
+
+```shell
+zig fetch --save "git+https://github.com/ciathefed/fehler#main"
 ```
 
 Add this snippet to your `build.zig`:
