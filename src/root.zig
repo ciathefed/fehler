@@ -53,6 +53,8 @@ pub const Diagnostic = struct {
     message: []const u8,
     location: ?SourceLoc = null,
     help: ?[]const u8 = null,
+    code: ?[]const u8 = null,
+    url: ?[]const u8 = null,
 
     /// Creates a new diagnostic with the specified severity and message.
     /// Additional properties can be added using the fluent interface methods.
@@ -76,6 +78,22 @@ pub const Diagnostic = struct {
     pub fn withHelp(self: Diagnostic, help: []const u8) Diagnostic {
         var diag = self;
         diag.help = help;
+        return diag;
+    }
+
+    /// Returns a copy of this diagnostic with the specified error code.
+    /// The code can be used to look up error documentation.
+    pub fn withCode(self: Diagnostic, code: []const u8) Diagnostic {
+        var diag = self;
+        diag.code = code;
+        return diag;
+    }
+
+    /// Returns a copy of this diagnostic with the specified documentation URL.
+    /// Useful for linking to online resources about this error.
+    pub fn withUrl(self: Diagnostic, url: []const u8) Diagnostic {
+        var diag = self;
+        diag.url = url;
         return diag;
     }
 };
@@ -121,13 +139,24 @@ pub const ErrorReporter = struct {
     /// If the diagnostic has a location and the source file is available,
     /// displays a source code snippet with the error location highlighted.
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
-        print("{s}{s}{s}: {s}{s}\n", .{
-            diagnostic.severity.color(),
-            Colors.bold,
-            diagnostic.severity.label(),
-            Colors.reset,
-            diagnostic.message,
-        });
+        if (diagnostic.code) |code| {
+            print("{s}{s}{s}[{s}]{s}: {s}\n", .{
+                diagnostic.severity.color(),
+                Colors.bold,
+                diagnostic.severity.label(),
+                code,
+                Colors.reset,
+                diagnostic.message,
+            });
+        } else {
+            print("{s}{s}{s}{s}: {s}\n", .{
+                diagnostic.severity.color(),
+                Colors.bold,
+                diagnostic.severity.label(),
+                Colors.reset,
+                diagnostic.message,
+            });
+        }
 
         if (diagnostic.location) |loc| {
             print("  {s}{s}{s}:{}:{}{s}\n", .{
@@ -148,6 +177,15 @@ pub const ErrorReporter = struct {
                 Colors.bold,
                 Colors.reset,
                 help,
+            });
+        }
+
+        if (diagnostic.url) |url| {
+            print("  {s}{s}see{s}: {s}\n", .{
+                Colors.blue,
+                Colors.bold,
+                Colors.reset,
+                url,
             });
         }
 
@@ -295,6 +333,26 @@ test "Diagnostic fluent interface - withHelp" {
     try testing.expectEqualStrings("try using --verbose flag", with_help.help.?);
 }
 
+test "Diagnostic fluent interface - withCode" {
+    const original = Diagnostic.init(.err, "missing semicolon");
+    const with_code = original.withCode("E0001");
+
+    try testing.expectEqual(Severity.err, with_code.severity);
+    try testing.expectEqualStrings("missing semicolon", with_code.message);
+    try testing.expect(with_code.code != null);
+    try testing.expectEqualStrings("E0001", with_code.code.?);
+}
+
+test "Diagnostic fluent interface - withUrl" {
+    const original = Diagnostic.init(.warn, "deprecated syntax");
+    const with_url = original.withUrl("https://docs.example.org/warnings/W123");
+
+    try testing.expectEqual(Severity.warn, with_url.severity);
+    try testing.expectEqualStrings("deprecated syntax", with_url.message);
+    try testing.expect(with_url.url != null);
+    try testing.expectEqualStrings("https://docs.example.org/warnings/W123", with_url.url.?);
+}
+
 test "Diagnostic fluent interface - chaining" {
     const loc = SourceLoc{
         .file = "chain.zig",
@@ -304,7 +362,9 @@ test "Diagnostic fluent interface - chaining" {
 
     const chained = Diagnostic.init(.err, "chained error")
         .withLocation(loc)
-        .withHelp("check the documentation");
+        .withHelp("check the documentation")
+        .withCode("E1002")
+        .withUrl("https://docs.example.org/errors/E1002");
 
     try testing.expectEqual(Severity.err, chained.severity);
     try testing.expectEqualStrings("chained error", chained.message);
@@ -312,6 +372,8 @@ test "Diagnostic fluent interface - chaining" {
     try testing.expectEqualStrings("chain.zig", chained.location.?.file);
     try testing.expect(chained.help != null);
     try testing.expectEqualStrings("check the documentation", chained.help.?);
+    try testing.expectEqualStrings("E1002", chained.code.?);
+    try testing.expectEqualStrings("https://docs.example.org/errors/E1002", chained.url.?);
 }
 
 test "ErrorReporter initialization and deinitialization" {
