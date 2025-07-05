@@ -80,7 +80,7 @@ pub fn main() !void {
 
 The above code produces output like this:
 
-![Example](./assets/example.png)
+<img src="./assets/example.png" onerror="this.src='https://raw.githubusercontent.com/ciathefed/fehler/main/assets/example.png'" alt="Example">
 
 ## API Reference
 
