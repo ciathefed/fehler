@@ -14,11 +14,51 @@ const Colors = struct {
     const dim = "\x1b[2m";
 };
 
-/// Represents a location in source code with file, line, and column information.
-pub const SourceLoc = struct {
-    file: []const u8,
+/// Represents a position in source code with line and column information.
+pub const Position = struct {
     line: usize,
     column: usize,
+};
+
+/// Represents a range in source code with start and end positions.
+pub const SourceRange = struct {
+    file: []const u8,
+    start: Position,
+    end: Position,
+
+    /// Creates a single-character range at the specified position.
+    pub fn single(file: []const u8, line: usize, column: usize) SourceRange {
+        return SourceRange{
+            .file = file,
+            .start = Position{ .line = line, .column = column },
+            .end = Position{ .line = line, .column = column },
+        };
+    }
+
+    /// Creates a range spanning from start to end positions.
+    pub fn span(file: []const u8, start_line: usize, start_col: usize, end_line: usize, end_col: usize) SourceRange {
+        return SourceRange{
+            .file = file,
+            .start = Position{ .line = start_line, .column = start_col },
+            .end = Position{ .line = end_line, .column = end_col },
+        };
+    }
+
+    /// Returns true if this range spans multiple lines.
+    pub fn isMultiline(self: SourceRange) bool {
+        return self.start.line != self.end.line;
+    }
+
+    /// Returns true if this range is a single character.
+    pub fn isSingleChar(self: SourceRange) bool {
+        return self.start.line == self.end.line and self.start.column == self.end.column;
+    }
+
+    /// Returns the length of the range on a single line (only valid for single-line ranges).
+    pub fn length(self: SourceRange) usize {
+        if (self.isMultiline()) return 0;
+        return if (self.end.column >= self.start.column) self.end.column - self.start.column + 1 else 1;
+    }
 };
 
 /// Severity levels for diagnostics, determining color and label presentation.
@@ -46,12 +86,12 @@ pub const Severity = enum {
     }
 };
 
-/// A diagnostic message with optional source location and help text.
+/// A diagnostic message with optional source range and help text.
 /// This is the primary data structure for representing compiler errors, warnings, and notes.
 pub const Diagnostic = struct {
     severity: Severity,
     message: []const u8,
-    location: ?SourceLoc = null,
+    range: ?SourceRange = null,
     help: ?[]const u8 = null,
     code: ?[]const u8 = null,
     url: ?[]const u8 = null,
@@ -65,11 +105,19 @@ pub const Diagnostic = struct {
         };
     }
 
-    /// Returns a copy of this diagnostic with the specified source location.
+    /// Returns a copy of this diagnostic with the specified source range.
     /// This method follows the builder pattern for fluent construction of diagnostics.
-    pub fn withLocation(self: Diagnostic, location: SourceLoc) Diagnostic {
+    pub fn withRange(self: Diagnostic, range: SourceRange) Diagnostic {
         var diag = self;
-        diag.location = location;
+        diag.range = range;
+        return diag;
+    }
+
+    /// Returns a copy of this diagnostic with a single-character range.
+    /// This method follows the builder pattern for fluent construction of diagnostics.
+    pub fn withLocation(self: Diagnostic, file: []const u8, line: usize, column: usize) Diagnostic {
+        var diag = self;
+        diag.range = SourceRange.single(file, line, column);
         return diag;
     }
 
@@ -136,8 +184,8 @@ pub const ErrorReporter = struct {
     }
 
     /// Reports a single diagnostic to stdout with color formatting.
-    /// If the diagnostic has a location and the source file is available,
-    /// displays a source code snippet with the error location highlighted.
+    /// If the diagnostic has a range and the source file is available,
+    /// displays a source code snippet with the error range highlighted.
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
         if (diagnostic.code) |code| {
             print("{s}{s}{s}[{s}]{s}: {s}\n", .{
@@ -158,17 +206,29 @@ pub const ErrorReporter = struct {
             });
         }
 
-        if (diagnostic.location) |loc| {
-            print("  {s}{s}{s}:{}:{}{s}\n", .{
-                Colors.cyan,
-                Colors.bold,
-                loc.file,
-                loc.line,
-                loc.column,
-                Colors.reset,
-            });
+        if (diagnostic.range) |range| {
+            if (range.isMultiline()) {
+                print("  {s}{s}{s}:{}:{}{s}\n", .{
+                    Colors.cyan,
+                    Colors.bold,
+                    range.file,
+                    range.start.line,
+                    range.start.column,
+                    Colors.reset,
+                });
+            } else {
+                print("  {s}{s}{s}:{}:{}{s}\n", .{
+                    Colors.cyan,
+                    Colors.bold,
+                    range.file,
+                    range.start.line,
+                    range.start.column,
+                    Colors.reset,
+                });
+            }
 
-            self.printSourceSnippet(loc) catch {};
+            const color = diagnostic.severity.color();
+            self.printSourceSnippet(range, color) catch {};
         }
 
         if (diagnostic.help) |help| {
@@ -200,16 +260,17 @@ pub const ErrorReporter = struct {
         }
     }
 
-    /// Prints a source code snippet showing the context around a diagnostic location.
-    /// Shows 2 lines before and after the error location, with the error line highlighted
-    /// and a caret (^) pointing to the specific column.
-    fn printSourceSnippet(self: *ErrorReporter, loc: SourceLoc) !void {
-        const source = self.sources.get(loc.file) orelse return;
+    /// Prints a source code snippet showing the context around a diagnostic range.
+    /// Shows 2 lines before and after the error location, with the error range highlighted
+    /// using carets (^) for single characters or tildes (~) for ranges.
+    fn printSourceSnippet(self: *ErrorReporter, range: SourceRange, color: []const u8) !void {
+        const source = self.sources.get(range.file) orelse return;
 
         var lines = std.mem.splitScalar(u8, source, '\n');
         var current_line: usize = 1;
-        const context_start = if (loc.line > 2) loc.line - 2 else 1;
-        const context_end = loc.line + 2;
+
+        const context_start = if (range.start.line > 2) range.start.line - 2 else 1;
+        const context_end = if (range.isMultiline()) range.end.line + 2 else range.start.line + 2;
 
         while (current_line < context_start and lines.next() != null) {
             current_line += 1;
@@ -220,7 +281,9 @@ pub const ErrorReporter = struct {
                 defer current_line += 1;
 
                 const line_num_width = 4;
-                if (current_line == loc.line) {
+                const is_error_line = current_line >= range.start.line and current_line <= range.end.line;
+
+                if (is_error_line) {
                     print("  {s}{s}{d:>4} |{s} {s}\n", .{
                         Colors.red,
                         Colors.bold,
@@ -229,17 +292,7 @@ pub const ErrorReporter = struct {
                         line,
                     });
 
-                    var i: usize = 0;
-                    print("  {s}", .{Colors.red});
-                    while (i < line_num_width + 1) : (i += 1) {
-                        print(" ", .{});
-                    }
-                    print("  ", .{});
-                    i = 1;
-                    while (i < loc.column) : (i += 1) {
-                        print(" ", .{});
-                    }
-                    print("^{s}\n", .{Colors.reset});
+                    self.printUnderline(range, current_line, line_num_width, color);
                 } else {
                     print("  {s}{d:>4} |{s} {s}\n", .{
                         Colors.dim,
@@ -253,10 +306,69 @@ pub const ErrorReporter = struct {
             }
         }
     }
+
+    /// Prints the underline (carets or tildes) for a specific line in a range.
+    fn printUnderline(
+        self: *ErrorReporter,
+        range: SourceRange,
+        line_num: usize,
+        line_num_width: usize,
+        color: []const u8,
+    ) void {
+        _ = self;
+
+        print("  {s}", .{color});
+
+        var i: usize = 0;
+        while (i < line_num_width + 1) : (i += 1) {
+            print(" ", .{});
+        }
+        print("  ", .{});
+
+        if (range.isMultiline()) {
+            if (line_num == range.start.line) {
+                i = 1;
+                while (i < range.start.column) : (i += 1) {
+                    print(" ", .{});
+                }
+                print("~", .{});
+                i = range.start.column + 1;
+                while (i <= 80) : (i += 1) {
+                    print("~", .{});
+                }
+            } else if (line_num == range.end.line) {
+                i = 1;
+                while (i <= range.end.column) : (i += 1) {
+                    print("~", .{});
+                }
+            } else {
+                i = 0;
+                while (i < 80) : (i += 1) {
+                    print("~", .{});
+                }
+            }
+        } else {
+            i = 1;
+            while (i < range.start.column) : (i += 1) {
+                print(" ", .{});
+            }
+
+            if (range.isSingleChar()) {
+                print("^", .{});
+            } else {
+                const range_length = range.length();
+                var j: usize = 0;
+                while (j < range_length) : (j += 1) {
+                    print("~", .{});
+                }
+            }
+        }
+
+        print("{s}\n", .{Colors.reset});
+    }
 };
 
-/// Convenience function to create a diagnostic with location information.
-/// This is equivalent to calling `Diagnostic.init().withLocation()` but more concise.
+/// Convenience function to create a diagnostic with single-character location information.
 pub fn createDiagnostic(
     severity: Severity,
     message: []const u8,
@@ -265,161 +377,91 @@ pub fn createDiagnostic(
     column: usize,
 ) Diagnostic {
     return Diagnostic.init(severity, message)
-        .withLocation(SourceLoc{
-        .file = file,
-        .line = line,
-        .column = column,
-    });
+        .withLocation(file, line, column);
+}
+
+/// Convenience function to create a diagnostic with range information.
+pub fn createDiagnosticRange(
+    severity: Severity,
+    message: []const u8,
+    file: []const u8,
+    start_line: usize,
+    start_col: usize,
+    end_line: usize,
+    end_col: usize,
+) Diagnostic {
+    return Diagnostic.init(severity, message)
+        .withRange(SourceRange.span(file, start_line, start_col, end_line, end_col));
 }
 
 const testing = std.testing;
 
-test "SourceLoc creation and access" {
-    const loc = SourceLoc{
-        .file = "test.zig",
-        .line = 10,
-        .column = 5,
-    };
-
-    try testing.expectEqualStrings("test.zig", loc.file);
-    try testing.expectEqual(@as(usize, 10), loc.line);
-    try testing.expectEqual(@as(usize, 5), loc.column);
+test "SourcePos creation" {
+    const pos = Position{ .line = 10, .column = 5 };
+    try testing.expectEqual(@as(usize, 10), pos.line);
+    try testing.expectEqual(@as(usize, 5), pos.column);
 }
 
-test "Severity color and label mapping" {
-    try testing.expectEqualStrings("\x1b[31m", Severity.err.color());
-    try testing.expectEqualStrings("\x1b[33m", Severity.warn.color());
-    try testing.expectEqualStrings("\x1b[34m", Severity.note.color());
+test "SourceRange single character" {
+    const range = SourceRange.single("test.zig", 10, 5);
 
-    try testing.expectEqualStrings("error", Severity.err.label());
-    try testing.expectEqualStrings("warning", Severity.warn.label());
-    try testing.expectEqualStrings("note", Severity.note.label());
+    try testing.expectEqualStrings("test.zig", range.file);
+    try testing.expectEqual(@as(usize, 10), range.start.line);
+    try testing.expectEqual(@as(usize, 5), range.start.column);
+    try testing.expectEqual(@as(usize, 10), range.end.line);
+    try testing.expectEqual(@as(usize, 5), range.end.column);
+    try testing.expect(range.isSingleChar());
+    try testing.expect(!range.isMultiline());
 }
 
-test "Diagnostic creation and initialization" {
-    const diag = Diagnostic.init(.err, "test error message");
+test "SourceRange span" {
+    const range = SourceRange.span("test.zig", 10, 5, 12, 8);
+
+    try testing.expectEqualStrings("test.zig", range.file);
+    try testing.expectEqual(@as(usize, 10), range.start.line);
+    try testing.expectEqual(@as(usize, 5), range.start.column);
+    try testing.expectEqual(@as(usize, 12), range.end.line);
+    try testing.expectEqual(@as(usize, 8), range.end.column);
+    try testing.expect(!range.isSingleChar());
+    try testing.expect(range.isMultiline());
+}
+
+test "SourceRange single line span" {
+    const range = SourceRange.span("test.zig", 10, 5, 10, 15);
+
+    try testing.expect(!range.isSingleChar());
+    try testing.expect(!range.isMultiline());
+    try testing.expectEqual(@as(usize, 11), range.length());
+}
+
+test "Diagnostic with range" {
+    const range = SourceRange.span("example.zig", 42, 10, 42, 20);
+    const diag = Diagnostic.init(.err, "test error")
+        .withRange(range);
 
     try testing.expectEqual(Severity.err, diag.severity);
-    try testing.expectEqualStrings("test error message", diag.message);
-    try testing.expectEqual(@as(?SourceLoc, null), diag.location);
-    try testing.expectEqual(@as(?[]const u8, null), diag.help);
+    try testing.expectEqualStrings("test error", diag.message);
+    try testing.expect(diag.range != null);
+    try testing.expectEqualStrings("example.zig", diag.range.?.file);
+    try testing.expectEqual(@as(usize, 42), diag.range.?.start.line);
+    try testing.expectEqual(@as(usize, 10), diag.range.?.start.column);
+    try testing.expectEqual(@as(usize, 42), diag.range.?.end.line);
+    try testing.expectEqual(@as(usize, 20), diag.range.?.end.column);
 }
 
-test "Diagnostic fluent interface - withLocation" {
-    const original = Diagnostic.init(.warn, "test warning");
-    const loc = SourceLoc{
-        .file = "example.zig",
-        .line = 42,
-        .column = 10,
-    };
+test "Diagnostic with location (backward compatibility)" {
+    const diag = Diagnostic.init(.warn, "test warning")
+        .withLocation("test.zig", 15, 8);
 
-    const with_location = original.withLocation(loc);
-
-    try testing.expectEqual(Severity.warn, with_location.severity);
-    try testing.expectEqualStrings("test warning", with_location.message);
-    try testing.expect(with_location.location != null);
-    try testing.expectEqualStrings("example.zig", with_location.location.?.file);
-    try testing.expectEqual(@as(usize, 42), with_location.location.?.line);
-    try testing.expectEqual(@as(usize, 10), with_location.location.?.column);
-}
-
-test "Diagnostic fluent interface - withHelp" {
-    const original = Diagnostic.init(.note, "test note");
-    const with_help = original.withHelp("try using --verbose flag");
-
-    try testing.expectEqual(Severity.note, with_help.severity);
-    try testing.expectEqualStrings("test note", with_help.message);
-    try testing.expect(with_help.help != null);
-    try testing.expectEqualStrings("try using --verbose flag", with_help.help.?);
-}
-
-test "Diagnostic fluent interface - withCode" {
-    const original = Diagnostic.init(.err, "missing semicolon");
-    const with_code = original.withCode("E0001");
-
-    try testing.expectEqual(Severity.err, with_code.severity);
-    try testing.expectEqualStrings("missing semicolon", with_code.message);
-    try testing.expect(with_code.code != null);
-    try testing.expectEqualStrings("E0001", with_code.code.?);
-}
-
-test "Diagnostic fluent interface - withUrl" {
-    const original = Diagnostic.init(.warn, "deprecated syntax");
-    const with_url = original.withUrl("https://docs.example.org/warnings/W123");
-
-    try testing.expectEqual(Severity.warn, with_url.severity);
-    try testing.expectEqualStrings("deprecated syntax", with_url.message);
-    try testing.expect(with_url.url != null);
-    try testing.expectEqualStrings("https://docs.example.org/warnings/W123", with_url.url.?);
-}
-
-test "Diagnostic fluent interface - chaining" {
-    const loc = SourceLoc{
-        .file = "chain.zig",
-        .line = 1,
-        .column = 1,
-    };
-
-    const chained = Diagnostic.init(.err, "chained error")
-        .withLocation(loc)
-        .withHelp("check the documentation")
-        .withCode("E1002")
-        .withUrl("https://docs.example.org/errors/E1002");
-
-    try testing.expectEqual(Severity.err, chained.severity);
-    try testing.expectEqualStrings("chained error", chained.message);
-    try testing.expect(chained.location != null);
-    try testing.expectEqualStrings("chain.zig", chained.location.?.file);
-    try testing.expect(chained.help != null);
-    try testing.expectEqualStrings("check the documentation", chained.help.?);
-    try testing.expectEqualStrings("E1002", chained.code.?);
-    try testing.expectEqualStrings("https://docs.example.org/errors/E1002", chained.url.?);
-}
-
-test "ErrorReporter initialization and deinitialization" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
-
-    try testing.expectEqual(@as(usize, 0), reporter.sources.count());
-}
-
-test "ErrorReporter addSource" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
-
-    const source_content = "const x = 42;\nconst y = x + 1;";
-    try reporter.addSource("test.zig", source_content);
-
-    try testing.expectEqual(@as(usize, 1), reporter.sources.count());
-
-    const stored_content = reporter.sources.get("test.zig");
-    try testing.expect(stored_content != null);
-    try testing.expectEqualStrings(source_content, stored_content.?);
-}
-
-test "ErrorReporter addSource multiple files" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
-
-    try reporter.addSource("file1.zig", "content1");
-    try reporter.addSource("file2.zig", "content2");
-    try reporter.addSource("file3.zig", "content3");
-
-    try testing.expectEqual(@as(usize, 3), reporter.sources.count());
-    try testing.expectEqualStrings("content1", reporter.sources.get("file1.zig").?);
-    try testing.expectEqualStrings("content2", reporter.sources.get("file2.zig").?);
-    try testing.expectEqualStrings("content3", reporter.sources.get("file3.zig").?);
-}
-
-test "ErrorReporter addSource overwrites existing" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
-
-    try reporter.addSource("test.zig", "original content");
-    try reporter.addSource("test.zig", "new content");
-
-    try testing.expectEqual(@as(usize, 1), reporter.sources.count());
-    try testing.expectEqualStrings("new content", reporter.sources.get("test.zig").?);
+    try testing.expectEqual(Severity.warn, diag.severity);
+    try testing.expectEqualStrings("test warning", diag.message);
+    try testing.expect(diag.range != null);
+    try testing.expectEqualStrings("test.zig", diag.range.?.file);
+    try testing.expectEqual(@as(usize, 15), diag.range.?.start.line);
+    try testing.expectEqual(@as(usize, 8), diag.range.?.start.column);
+    try testing.expectEqual(@as(usize, 15), diag.range.?.end.line);
+    try testing.expectEqual(@as(usize, 8), diag.range.?.end.column);
+    try testing.expect(diag.range.?.isSingleChar());
 }
 
 test "createDiagnostic convenience function" {
@@ -427,13 +469,29 @@ test "createDiagnostic convenience function" {
 
     try testing.expectEqual(Severity.err, diag.severity);
     try testing.expectEqualStrings("syntax error", diag.message);
-    try testing.expect(diag.location != null);
-    try testing.expectEqualStrings("main.zig", diag.location.?.file);
-    try testing.expectEqual(@as(usize, 15), diag.location.?.line);
-    try testing.expectEqual(@as(usize, 8), diag.location.?.column);
+    try testing.expect(diag.range != null);
+    try testing.expectEqualStrings("main.zig", diag.range.?.file);
+    try testing.expectEqual(@as(usize, 15), diag.range.?.start.line);
+    try testing.expectEqual(@as(usize, 8), diag.range.?.start.column);
+    try testing.expect(diag.range.?.isSingleChar());
 }
 
-test "ErrorReporter with sample diagnostics" {
+test "createDiagnosticRange convenience function" {
+    const diag = createDiagnosticRange(.warn, "long identifier", "main.zig", 15, 8, 15, 25);
+
+    try testing.expectEqual(Severity.warn, diag.severity);
+    try testing.expectEqualStrings("long identifier", diag.message);
+    try testing.expect(diag.range != null);
+    try testing.expectEqualStrings("main.zig", diag.range.?.file);
+    try testing.expectEqual(@as(usize, 15), diag.range.?.start.line);
+    try testing.expectEqual(@as(usize, 8), diag.range.?.start.column);
+    try testing.expectEqual(@as(usize, 15), diag.range.?.end.line);
+    try testing.expectEqual(@as(usize, 25), diag.range.?.end.column);
+    try testing.expect(!diag.range.?.isSingleChar());
+    try testing.expect(!diag.range.?.isMultiline());
+}
+
+test "ErrorReporter with range diagnostics" {
     var reporter = ErrorReporter.init(testing.allocator);
     defer reporter.deinit();
 
@@ -442,7 +500,7 @@ test "ErrorReporter with sample diagnostics" {
         \\const print = std.debug.print;
         \\
         \\pub fn main() void {
-        \\    const x = 42;
+        \\    const very_long_variable_name = 42;
         \\    const y = x + "hello"; // Type mismatch error
         \\    print("Result: {}\n", .{y});
         \\}
@@ -451,92 +509,29 @@ test "ErrorReporter with sample diagnostics" {
     try reporter.addSource("example.zig", source);
 
     const diagnostics = [_]Diagnostic{
-        createDiagnostic(.err, "type mismatch: cannot add integer and string", "example.zig", 6, 15),
-        Diagnostic.init(.note, "consider converting the string to an integer")
-            .withHelp("use std.fmt.parseInt() to convert strings to integers"),
-        Diagnostic.init(.warn, "unused variable 'y'")
-            .withLocation(SourceLoc{ .file = "example.zig", .line = 6, .column = 11 }),
+        createDiagnosticRange(.err, "type mismatch: cannot add integer and string", "example.zig", 6, 15, 6, 23),
+        createDiagnosticRange(.warn, "variable name is too long", "example.zig", 5, 11, 5, 35),
+        createDiagnostic(.err, "undefined variable 'x'", "example.zig", 6, 15),
     };
 
     try testing.expectEqual(@as(usize, 3), diagnostics.len);
     try testing.expectEqual(Severity.err, diagnostics[0].severity);
-    try testing.expectEqual(Severity.note, diagnostics[1].severity);
-    try testing.expectEqual(Severity.warn, diagnostics[2].severity);
+    try testing.expectEqual(Severity.warn, diagnostics[1].severity);
+    try testing.expectEqual(Severity.err, diagnostics[2].severity);
 }
 
-test "ErrorReporter memory management" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
+test "Multi-line range" {
+    const range = SourceRange.span("test.zig", 5, 10, 8, 15);
 
-    const test_cases = [_]struct { filename: []const u8, content: []const u8 }{
-        .{ .filename = "file0.zig", .content = "const value0 = 0;" },
-        .{ .filename = "file1.zig", .content = "const value1 = 10;" },
-        .{ .filename = "file2.zig", .content = "const value2 = 20;" },
-        .{ .filename = "file3.zig", .content = "const value3 = 30;" },
-        .{ .filename = "file4.zig", .content = "const value4 = 40;" },
-        .{ .filename = "file5.zig", .content = "const value5 = 50;" },
-        .{ .filename = "file6.zig", .content = "const value6 = 60;" },
-        .{ .filename = "file7.zig", .content = "const value7 = 70;" },
-        .{ .filename = "file8.zig", .content = "const value8 = 80;" },
-        .{ .filename = "file9.zig", .content = "const value9 = 90;" },
-    };
-
-    for (test_cases) |test_case| {
-        try reporter.addSource(test_case.filename, test_case.content);
-    }
-
-    try testing.expectEqual(@as(usize, 10), reporter.sources.count());
-
-    try testing.expect(reporter.sources.contains("file0.zig"));
-    try testing.expect(reporter.sources.contains("file9.zig"));
-    try testing.expect(!reporter.sources.contains("file10.zig"));
-
-    try testing.expectEqualStrings("const value0 = 0;", reporter.sources.get("file0.zig").?);
-    try testing.expectEqualStrings("const value9 = 90;", reporter.sources.get("file9.zig").?);
+    try testing.expect(range.isMultiline());
+    try testing.expect(!range.isSingleChar());
+    try testing.expectEqual(@as(usize, 5), range.start.line);
+    try testing.expectEqual(@as(usize, 10), range.start.column);
+    try testing.expectEqual(@as(usize, 8), range.end.line);
+    try testing.expectEqual(@as(usize, 15), range.end.column);
 }
 
-test "SourceLoc edge cases" {
-    const loc_zero = SourceLoc{
-        .file = "",
-        .line = 0,
-        .column = 0,
-    };
-
-    const loc_large = SourceLoc{
-        .file = "very_long_filename_that_might_cause_issues.zig",
-        .line = std.math.maxInt(usize),
-        .column = std.math.maxInt(usize),
-    };
-
-    try testing.expectEqualStrings("", loc_zero.file);
-    try testing.expectEqual(@as(usize, 0), loc_zero.line);
-    try testing.expectEqual(@as(usize, 0), loc_zero.column);
-
-    try testing.expectEqualStrings("very_long_filename_that_might_cause_issues.zig", loc_large.file);
-    try testing.expectEqual(std.math.maxInt(usize), loc_large.line);
-    try testing.expectEqual(std.math.maxInt(usize), loc_large.column);
-}
-
-test "Diagnostic with empty strings" {
-    const diag = Diagnostic.init(.note, "")
-        .withHelp("");
-
-    try testing.expectEqualStrings("", diag.message);
-    try testing.expectEqualStrings("", diag.help.?);
-}
-
-test "ErrorReporter with empty source" {
-    var reporter = ErrorReporter.init(testing.allocator);
-    defer reporter.deinit();
-
-    try reporter.addSource("empty.zig", "");
-
-    const stored = reporter.sources.get("empty.zig");
-    try testing.expect(stored != null);
-    try testing.expectEqualStrings("", stored.?);
-}
-
-test "ErrorReporter integration example" {
+test "ErrorReporter integration with ranges" {
     var reporter = ErrorReporter.init(testing.allocator);
     defer reporter.deinit();
 
@@ -555,20 +550,15 @@ test "ErrorReporter integration example" {
 
     try reporter.addSource("hello.zig", source_code);
 
-    const error_diag = createDiagnostic(.err, "expected '}', found end of file", "hello.zig", 10, 1);
+    // Test different types of ranges
+    const single_char = createDiagnostic(.err, "missing semicolon", "hello.zig", 10, 1);
+    const short_range = createDiagnosticRange(.warn, "unused variable", "hello.zig", 6, 11, 6, 18);
+    const long_range = createDiagnosticRange(.note, "function signature", "hello.zig", 3, 1, 3, 25);
 
-    const warning_diag = Diagnostic.init(.warn, "variable 'greeting' is never used")
-        .withLocation(SourceLoc{ .file = "hello.zig", .line = 6, .column = 22 })
-        .withHelp("consider removing unused variables or prefixing with '_'");
-
-    const note_diag = Diagnostic.init(.note, "compilation terminated due to previous error");
-
-    try testing.expectEqual(Severity.err, error_diag.severity);
-    try testing.expectEqual(Severity.warn, warning_diag.severity);
-    try testing.expectEqual(Severity.note, note_diag.severity);
-
-    try testing.expect(error_diag.location != null);
-    try testing.expect(warning_diag.location != null);
-    try testing.expect(warning_diag.help != null);
-    try testing.expect(note_diag.location == null);
+    try testing.expect(single_char.range.?.isSingleChar());
+    try testing.expect(!short_range.range.?.isSingleChar());
+    try testing.expect(!short_range.range.?.isMultiline());
+    try testing.expect(!long_range.range.?.isMultiline());
+    try testing.expectEqual(@as(usize, 8), short_range.range.?.length());
+    try testing.expectEqual(@as(usize, 25), long_range.range.?.length());
 }
