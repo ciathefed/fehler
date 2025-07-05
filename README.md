@@ -71,7 +71,7 @@ pub fn main() !void {
 
     // Create diagnostic with range highlighting
     const diagnostic = Diagnostic.init(.err, "type mismatch: cannot add integer and string")
-        .withRange(SourceRange.span("example.zig", 5, 15, 5, 23))
+        .withRange(SourceRange.span("example.zig", 5, 19, 5, 25))
         .withHelp("consider converting the string to an integer using std.fmt.parseInt()")
         .withCode("E0001")
         .withUrl("https://docs.example.org/errors/E0001");
