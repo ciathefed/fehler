@@ -5,6 +5,7 @@ const Allocator = std.mem.Allocator;
 pub const OutputFormat = enum {
     fehler,
     gcc,
+    msvc,
 };
 
 /// ANSI color codes and formatting constants for terminal output.
@@ -197,6 +198,7 @@ pub const ErrorReporter = struct {
         switch (self.output_format) {
             .fehler => self.printFehler(diagnostic),
             .gcc => self.printGcc(diagnostic),
+            .msvc => self.printMsvc(diagnostic),
         }
     }
 
@@ -292,6 +294,23 @@ pub const ErrorReporter = struct {
                 diagnostic.message,
                 Colors.reset,
             });
+        }
+    }
+
+    fn printMsvc(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        _ = self;
+        if (diagnostic.range) |range| {
+            const code = diagnostic.code orelse "";
+            print("{s}({d},{d}): {s} {s}: {s}\n", .{
+                range.file,
+                range.start.line,
+                range.start.column,
+                diagnostic.severity.label(),
+                code,
+                diagnostic.message,
+            });
+        } else {
+            print("{s}: {s}\n", .{ diagnostic.severity.label(), diagnostic.message });
         }
     }
 
