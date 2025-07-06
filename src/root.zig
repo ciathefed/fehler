@@ -158,15 +158,16 @@ pub const Diagnostic = struct {
 pub const ErrorReporter = struct {
     allocator: Allocator,
     sources: std.StringHashMap([]const u8),
-    output_format: OutputFormat,
+    format: OutputFormat,
 
     /// Initializes a new ErrorReporter with the given allocator.
     /// The reporter starts with no source files registered.
-    pub fn init(allocator: Allocator, output_format: OutputFormat) ErrorReporter {
+    /// Uses the default output format (Fehler).
+    pub fn init(allocator: Allocator) ErrorReporter {
         return ErrorReporter{
             .allocator = allocator,
             .sources = std.StringHashMap([]const u8).init(allocator),
-            .output_format = output_format,
+            .format = .fehler,
         };
     }
 
@@ -178,6 +179,14 @@ pub const ErrorReporter = struct {
             self.allocator.free(entry.value_ptr.*);
         }
         self.sources.deinit();
+    }
+
+    /// Returns a copy of this reporter with the specified output format.
+    /// Allows changing the format without breaking API compatibility.
+    pub fn withFormat(self: ErrorReporter, format: OutputFormat) ErrorReporter {
+        var reporter = self;
+        reporter.format = format;
+        return reporter;
     }
 
     /// Adds a source file to the reporter for later reference in diagnostics.
@@ -195,7 +204,7 @@ pub const ErrorReporter = struct {
     /// If the diagnostic has a range and the source file is available,
     /// displays a source code snippet with the error range highlighted.
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
-        switch (self.output_format) {
+        switch (self.format) {
             .fehler => self.printFehler(diagnostic),
             .gcc => self.printGcc(diagnostic),
             .msvc => self.printMsvc(diagnostic),
