@@ -4,6 +4,7 @@ const Allocator = std.mem.Allocator;
 
 pub const OutputFormat = enum {
     fehler,
+    gcc,
 };
 
 /// ANSI color codes and formatting constants for terminal output.
@@ -195,6 +196,7 @@ pub const ErrorReporter = struct {
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
         switch (self.output_format) {
             .fehler => self.printFehler(diagnostic),
+            .gcc => self.printGcc(diagnostic),
         }
     }
 
@@ -262,6 +264,35 @@ pub const ErrorReporter = struct {
         }
 
         print("\n", .{});
+    }
+
+    fn printGcc(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        _ = self;
+        const color = diagnostic.severity.color();
+        if (diagnostic.range) |range| {
+            print("{s}{s}:{d}:{d}: {s}{s}: {s}{s}{s}{s}\n", .{
+                Colors.bold,
+                range.file,
+                range.start.line,
+                range.start.column,
+                color,
+                diagnostic.severity.label(),
+                Colors.reset,
+                Colors.bold,
+                diagnostic.message,
+                Colors.reset,
+            });
+        } else {
+            print("{s}{s}{s}: {s}{s}{s}{s}\n", .{
+                Colors.bold,
+                color,
+                diagnostic.severity.label(),
+                Colors.reset,
+                Colors.bold,
+                diagnostic.message,
+                Colors.reset,
+            });
+        }
     }
 
     /// Reports multiple diagnostics in sequence.
