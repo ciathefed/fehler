@@ -563,7 +563,7 @@ test "createDiagnosticRange convenience function" {
 }
 
 test "ErrorReporter with range diagnostics" {
-    var reporter = ErrorReporter.init(testing.allocator, .fehler);
+    var reporter = ErrorReporter.init(testing.allocator);
     defer reporter.deinit();
 
     const source =
@@ -603,7 +603,7 @@ test "Multi-line range" {
 }
 
 test "ErrorReporter integration with ranges" {
-    var reporter = ErrorReporter.init(testing.allocator, .fehler);
+    var reporter = ErrorReporter.init(testing.allocator);
     defer reporter.deinit();
 
     const source_code =
