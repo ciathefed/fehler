@@ -21,7 +21,7 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 ### Latest Release (recommended)
 
 ```shell
-zig fetch --save "git+https://github.com/ciathefed/fehler#v0.2.0"
+zig fetch --save "git+https://github.com/ciathefed/fehler#v0.3.0"
 ````
 
 ### Latest on `main` (bleeding edge)
