@@ -2,6 +2,10 @@ const std = @import("std");
 const print = std.debug.print;
 const Allocator = std.mem.Allocator;
 
+pub const OutputFormat = enum {
+    fehler,
+};
+
 /// ANSI color codes and formatting constants for terminal output.
 const Colors = struct {
     const reset = "\x1b[0m";
@@ -152,13 +156,15 @@ pub const Diagnostic = struct {
 pub const ErrorReporter = struct {
     allocator: Allocator,
     sources: std.StringHashMap([]const u8),
+    output_format: OutputFormat,
 
     /// Initializes a new ErrorReporter with the given allocator.
     /// The reporter starts with no source files registered.
-    pub fn init(allocator: Allocator) ErrorReporter {
+    pub fn init(allocator: Allocator, output_format: OutputFormat) ErrorReporter {
         return ErrorReporter{
             .allocator = allocator,
             .sources = std.StringHashMap([]const u8).init(allocator),
+            .output_format = output_format,
         };
     }
 
@@ -187,6 +193,12 @@ pub const ErrorReporter = struct {
     /// If the diagnostic has a range and the source file is available,
     /// displays a source code snippet with the error range highlighted.
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        switch (self.output_format) {
+            .fehler => self.printFehler(diagnostic),
+        }
+    }
+
+    fn printFehler(self: *ErrorReporter, diagnostic: Diagnostic) void {
         if (diagnostic.code) |code| {
             print("{s}{s}{s}[{s}]{s}: {s}\n", .{
                 diagnostic.severity.color(),
@@ -492,7 +504,7 @@ test "createDiagnosticRange convenience function" {
 }
 
 test "ErrorReporter with range diagnostics" {
-    var reporter = ErrorReporter.init(testing.allocator);
+    var reporter = ErrorReporter.init(testing.allocator, .fehler);
     defer reporter.deinit();
 
     const source =
@@ -532,7 +544,7 @@ test "Multi-line range" {
 }
 
 test "ErrorReporter integration with ranges" {
-    var reporter = ErrorReporter.init(testing.allocator);
+    var reporter = ErrorReporter.init(testing.allocator, .fehler);
     defer reporter.deinit();
 
     const source_code =
