@@ -14,6 +14,7 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 - 🔧 **Help Messages**: Optional help text for guiding users to solutions
 - 🏗️ **Fluent Interface**: Builder pattern for easy diagnostic construction
 - 🧠 **Memory Safe**: Proper memory management with allocator-based design
+- 🎨 **Multiple Output Formats**: Supports `Fehler` (default), `GCC`, and `MSVC` styles
 
 ## Install
 
@@ -21,7 +22,7 @@ A comprehensive error reporting system for Zig that provides rich, colorful diag
 
 ```shell
 zig fetch --save "git+https://github.com/ciathefed/fehler#v0.2.0"
-```
+````
 
 ### Latest on `main` (bleeding edge)
 
@@ -53,10 +54,14 @@ pub fn main() !void {
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 
+    // Initialize reporter with default Fehler format
     var reporter = ErrorReporter.init(allocator);
+
+    // Or specify a different format with withFormat()
+    // var reporter = ErrorReporter.init(allocator).withFormat(.gcc);
+
     defer reporter.deinit();
 
-    // Add source code
     const source =
         \\const std = @import("std");
         \\
@@ -69,7 +74,6 @@ pub fn main() !void {
 
     try reporter.addSource("example.zig", source);
 
-    // Create diagnostic with range highlighting
     const diagnostic = Diagnostic.init(.err, "type mismatch: cannot add integer and string")
         .withRange(SourceRange.span("example.zig", 5, 19, 5, 25))
         .withHelp("consider converting the string to an integer using std.fmt.parseInt()")
@@ -80,21 +84,41 @@ pub fn main() !void {
 }
 ```
 
-## Output Example
+## Output Examples
 
-The above code produces output like this:
+### Fehler (default)
 
-<img src="./assets/example.png" onerror="this.src='https://raw.githubusercontent.com/ciathefed/fehler/main/assets/example.png'" alt="Example">
+![Fehler Example](./assets/example_fehler.png)
+
+### GCC style
+
+```zig
+var reporter = ErrorReporter.init(allocator).withFormat(.gcc);
+reporter.report(diagnostic);
+```
+
+![GCC Example](./assets/example_gcc.png)
+
+### MSVC style
+
+```zig
+var reporter = ErrorReporter.init(allocator).withFormat(.msvc);
+reporter.report(diagnostic);
+```
+
+![MSVC Example](./assets/example_msvc.png)
 
 ## API Reference
 
 ### Core Types
 
 #### `Severity`
+
 Represents the severity level of a diagnostic:
-- `.err` - Error (red)
-- `.warn` - Warning (yellow)
-- `.note` - Note/info (blue)
+
+* `.err` - Error (red)
+* `.warn` - Warning (yellow)
+* `.note` - Note/info (blue)
 
 ```zig
 const severity = Severity.err;
@@ -103,6 +127,7 @@ const label = severity.label();  // Returns "error", "warning", or "note"
 ```
 
 #### `Position`
+
 Represents a position in source code:
 
 ```zig
@@ -113,6 +138,7 @@ const position = Position{
 ```
 
 #### `SourceRange`
+
 Represents a range in source code with start and end positions:
 
 ```zig
@@ -132,6 +158,7 @@ const length = range.length();             // length for single-line ranges
 ```
 
 #### `Diagnostic`
+
 The main diagnostic message structure:
 
 ```zig
@@ -167,12 +194,16 @@ const full_diag = Diagnostic.init(.err, "parse error")
 ```
 
 #### `ErrorReporter`
+
 The main error reporting system:
 
 ```zig
-// Initialize
+// Initialize reporter (default Fehler format)
 var reporter = ErrorReporter.init(allocator);
-defer reporter.deinit();
+
+// Change output format if desired
+var reporter_gcc = reporter.withFormat(.gcc);
+var reporter_msvc = reporter.withFormat(.msvc);
 
 // Add source files
 try reporter.addSource("main.zig", source_content);
@@ -188,6 +219,7 @@ reporter.reportMany(&diagnostics);
 ### Convenience Functions
 
 #### `createDiagnostic`
+
 Shorthand for creating diagnostics with single-character location:
 
 ```zig
@@ -204,6 +236,7 @@ const diag = createDiagnostic(
 ```
 
 #### `createDiagnosticRange`
+
 Shorthand for creating diagnostics with range highlighting:
 
 ```zig
@@ -224,18 +257,21 @@ const diag = createDiagnosticRange(
 The diagnostic system uses different visual indicators based on the range:
 
 ### Single Character (Caret `^`)
+
 ```
    5 |     const y = x + "hello";
      |               ^
 ```
 
 ### Single Line Range (Tildes `~`)
+
 ```
    5 |     const very_long_variable_name = 42;
      |           ~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
 ### Multi-line Range (Tildes `~`)
+
 ```
    5 |     const result = calculate(
      |                    ~~~~~~~~~
@@ -245,28 +281,6 @@ The diagnostic system uses different visual indicators based on the range:
      | ~~~~~~~~~~~~~~
    8 |     );
      | ~~~~~
-```
-
-## Migration from v0.1.0
-
-The new version maintains backward compatibility while adding range support:
-
-```zig
-// Old way (still works)
-const diag = Diagnostic.init(.err, "error message")
-    .withLocation(SourceLoc{
-        .file = "main.zig",
-        .line = 10,
-        .column = 5,
-    });
-
-// New way (recommended)
-const diag = Diagnostic.init(.err, "error message")
-    .withLocation("main.zig", 10, 5);  // Single character
-
-// Or with ranges
-const diag = Diagnostic.init(.err, "error message")
-    .withRange(SourceRange.span("main.zig", 10, 5, 10, 15));
 ```
 
 ## Contributing
@@ -282,9 +296,9 @@ To contribute code:
 
 Please follow the [Conventional Commits](https://www.conventionalcommits.org/) format for commit messages. Examples:
 
-- `fix: handle empty source input in reporter`
-- `feat: add support for range-based highlighting`
-- `refactor: simplify diagnostic builder`
+* `fix: handle empty source input in reporter`
+* `feat: add support for range-based highlighting`
+* `refactor: simplify diagnostic builder`
 
 Keep changes focused and minimal. Include tests when appropriate.
 

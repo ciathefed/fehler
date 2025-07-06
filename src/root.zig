@@ -2,6 +2,12 @@ const std = @import("std");
 const print = std.debug.print;
 const Allocator = std.mem.Allocator;
 
+pub const OutputFormat = enum {
+    fehler,
+    gcc,
+    msvc,
+};
+
 /// ANSI color codes and formatting constants for terminal output.
 const Colors = struct {
     const reset = "\x1b[0m";
@@ -152,13 +158,16 @@ pub const Diagnostic = struct {
 pub const ErrorReporter = struct {
     allocator: Allocator,
     sources: std.StringHashMap([]const u8),
+    format: OutputFormat,
 
     /// Initializes a new ErrorReporter with the given allocator.
     /// The reporter starts with no source files registered.
+    /// Uses the default output format (Fehler).
     pub fn init(allocator: Allocator) ErrorReporter {
         return ErrorReporter{
             .allocator = allocator,
             .sources = std.StringHashMap([]const u8).init(allocator),
+            .format = .fehler,
         };
     }
 
@@ -170,6 +179,14 @@ pub const ErrorReporter = struct {
             self.allocator.free(entry.value_ptr.*);
         }
         self.sources.deinit();
+    }
+
+    /// Returns a copy of this reporter with the specified output format.
+    /// Allows changing the format without breaking API compatibility.
+    pub fn withFormat(self: ErrorReporter, format: OutputFormat) ErrorReporter {
+        var reporter = self;
+        reporter.format = format;
+        return reporter;
     }
 
     /// Adds a source file to the reporter for later reference in diagnostics.
@@ -187,6 +204,14 @@ pub const ErrorReporter = struct {
     /// If the diagnostic has a range and the source file is available,
     /// displays a source code snippet with the error range highlighted.
     pub fn report(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        switch (self.format) {
+            .fehler => self.printFehler(diagnostic),
+            .gcc => self.printGcc(diagnostic),
+            .msvc => self.printMsvc(diagnostic),
+        }
+    }
+
+    fn printFehler(self: *ErrorReporter, diagnostic: Diagnostic) void {
         if (diagnostic.code) |code| {
             print("{s}{s}{s}[{s}]{s}: {s}\n", .{
                 diagnostic.severity.color(),
@@ -250,6 +275,52 @@ pub const ErrorReporter = struct {
         }
 
         print("\n", .{});
+    }
+
+    fn printGcc(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        _ = self;
+        const color = diagnostic.severity.color();
+        if (diagnostic.range) |range| {
+            print("{s}{s}:{d}:{d}: {s}{s}: {s}{s}{s}{s}\n", .{
+                Colors.bold,
+                range.file,
+                range.start.line,
+                range.start.column,
+                color,
+                diagnostic.severity.label(),
+                Colors.reset,
+                Colors.bold,
+                diagnostic.message,
+                Colors.reset,
+            });
+        } else {
+            print("{s}{s}{s}: {s}{s}{s}{s}\n", .{
+                Colors.bold,
+                color,
+                diagnostic.severity.label(),
+                Colors.reset,
+                Colors.bold,
+                diagnostic.message,
+                Colors.reset,
+            });
+        }
+    }
+
+    fn printMsvc(self: *ErrorReporter, diagnostic: Diagnostic) void {
+        _ = self;
+        if (diagnostic.range) |range| {
+            const code = diagnostic.code orelse "";
+            print("{s}({d},{d}): {s} {s}: {s}\n", .{
+                range.file,
+                range.start.line,
+                range.start.column,
+                diagnostic.severity.label(),
+                code,
+                diagnostic.message,
+            });
+        } else {
+            print("{s}: {s}\n", .{ diagnostic.severity.label(), diagnostic.message });
+        }
     }
 
     /// Reports multiple diagnostics in sequence.
