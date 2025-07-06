@@ -88,7 +88,7 @@ pub fn main() !void {
 
 ### Fehler (default)
 
-<img src="./assets/example_fehler.png" onerror="this.src='https://raw.githubusercontent.com/ciathefed/fehler/main/assets/example_fehler.png'" alt="Fehler Output Example">
+![Fehler Example](./assets/example_fehler.png)
 
 ### GCC style
 
@@ -97,7 +97,7 @@ var reporter = ErrorReporter.init(allocator).withFormat(.gcc);
 reporter.report(diagnostic);
 ```
 
-<img src="./assets/example_gcc.png" onerror="this.src='https://raw.githubusercontent.com/ciathefed/fehler/main/assets/example_gcc.png'" alt="GCC Output Example">
+![GCC Example](./assets/example_gcc.png)
 
 ### MSVC style
 
@@ -106,7 +106,7 @@ var reporter = ErrorReporter.init(allocator).withFormat(.msvc);
 reporter.report(diagnostic);
 ```
 
-<img src="./assets/example_msvc.png" onerror="this.src='https://raw.githubusercontent.com/ciathefed/fehler/main/assets/example_msvc.png'" alt="MSVC Output Example">
+![MSVC Example](./assets/example_msvc.png)
 
 ## API Reference
 
