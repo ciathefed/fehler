@@ -16,9 +16,6 @@ jobs:
         with:
           version: 0.14.1
 
-      - name: "Build the tests."
-        run: zig build test
-
       - name: "Run the tests."
         run: zig test src/tests.zig
 
