@@ -15,4 +15,18 @@ jobs:
       - uses: mlugg/setup-zig@v2
         with:
           version: 0.14.1
-      - run: zig build test
+
+      - name: "Build the tests."
+        run: zig build test
+
+      - name: "Run the tests."
+        run: zig test src/tests.zig
+
+      - name: "Generate documentation."
+        run: zig build-lib -femit-docs src/root.zig
+
+      - name: "Deploy the documentation."
+        uses: JamesIves/github-pages-deploy-action@v4.2.5
+        with:
+          branch: gh-pages
+          folder: docs
