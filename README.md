@@ -116,9 +116,12 @@ reporter.report(diagnostic);
 
 Represents the severity level of a diagnostic:
 
+* `.fatal` - Fatal error, unrecoverable internal error (red)
 * `.err` - Error (red)
 * `.warn` - Warning (yellow)
 * `.note` - Note/info (blue)
+* `.todo` - To-do reminder, incomplete feature (magenta)
+* `.unimplemented` - Feature not implemented (cyan)
 
 ```zig
 const severity = Severity.err;
