@@ -14,6 +14,7 @@ const Colors = struct {
     const red = "\x1b[31m";
     const yellow = "\x1b[33m";
     const blue = "\x1b[34m";
+    const magenta = "\x1b[35m";
     const cyan = "\x1b[36m";
     const white = "\x1b[37m";
     const bold = "\x1b[1m";
@@ -69,25 +70,34 @@ pub const SourceRange = struct {
 
 /// Severity levels for diagnostics, determining color and label presentation.
 pub const Severity = enum {
+    fatal,
     err,
     warn,
     note,
+    todo,
+    unimplemented,
 
     /// Returns the ANSI color code associated with this severity level.
     pub fn color(self: Severity) []const u8 {
         return switch (self) {
+            .fatal => Colors.red,
             .err => Colors.red,
             .warn => Colors.yellow,
             .note => Colors.blue,
+            .todo => Colors.magenta,
+            .unimplemented => Colors.cyan,
         };
     }
 
     /// Returns the human-readable label for this severity level.
     pub fn label(self: Severity) []const u8 {
         return switch (self) {
+            .fatal => "fatal",
             .err => "error",
             .warn => "warning",
             .note => "note",
+            .todo => "todo",
+            .unimplemented => "unimplemented",
         };
     }
 };
