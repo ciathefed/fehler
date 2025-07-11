@@ -219,6 +219,25 @@ const diagnostics = [_]Diagnostic{ diag1, diag2, diag3 };
 reporter.reportMany(&diagnostics);
 ```
 
+#### `emitSarif`
+
+Exports diagnostics to SARIF format (version 2.1.0) as a JSON stream.
+
+```zig
+try emitSarif(diagnostics, writer);
+```
+
+Writes a `runs` array with all diagnostics as SARIF `results`. If a `code` is set, it's included as a rule ID.
+
+```zig
+const file = try std.fs.cwd().createFile("report.sarif.json", .{});
+defer file.close();
+
+try emitSarif(&[_]Diagnostic{diag}, file.writer());
+```
+
+Use this to integrate with editors or CI tools that support SARIF (e.g. GitHub, VS Code, etc).
+
 ### Convenience Functions
 
 #### `createDiagnostic`
