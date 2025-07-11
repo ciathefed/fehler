@@ -126,7 +126,7 @@ Represents the severity level of a diagnostic:
 ```zig
 const severity = Severity.err;
 const color = severity.color();  // Returns ANSI color code
-const label = severity.label();  // Returns "error", "warning", or "note"
+const label = severity.label();  // Returns "error", "warning", "note", etc
 ```
 
 #### `Position`
