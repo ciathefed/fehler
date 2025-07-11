@@ -173,3 +173,24 @@ test "ErrorReporter integration with ranges" {
     try testing.expectEqual(@as(usize, 8), short_range.range.?.length());
     try testing.expectEqual(@as(usize, 25), long_range.range.?.length());
 }
+
+test "emitSarif outputs valid JSON with basic diagnostic" {
+    var buffer: [1024]u8 = undefined;
+
+    const diag1 = Diagnostic.init(.err, "invalid token")
+        .withLocation("main.zig", 1, 2)
+        .withCode("E001");
+
+    const diag2 = Diagnostic.init(.err, "invalid token")
+        .withLocation("main.zig", 3, 4)
+        .withCode("E001");
+
+    var stream = std.io.fixedBufferStream(&buffer);
+    try felher.emitSarif(&[_]Diagnostic{ diag1, diag2 }, stream.writer());
+
+    const json = buffer[0..stream.pos];
+    try testing.expect(std.mem.indexOf(u8, json, "\"message\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "invalid token") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "main.zig") != null);
+    try testing.expect(std.mem.indexOf(u8, json, "E001") != null);
+}
