@@ -489,7 +489,7 @@ pub fn emitSarif(diagnostics: []const Diagnostic, writer: anytype) !void {
     try buf_writer.write("fehler");
 
     try buf_writer.objectField("version");
-    try buf_writer.write("0.4.0");
+    try buf_writer.write("0.5.0");
 
     try buf_writer.objectField("informationUri");
     try buf_writer.write("https://github.com/ciathefed/fehler");
