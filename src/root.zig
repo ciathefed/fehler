@@ -1,5 +1,6 @@
 const std = @import("std");
 const print = std.debug.print;
+const json = std.json;
 const Allocator = std.mem.Allocator;
 
 pub const OutputFormat = enum {
@@ -448,6 +449,161 @@ pub const ErrorReporter = struct {
         print("{s}\n", .{Colors.reset});
     }
 };
+
+const sarif_version: []const u8 = "2.1.0";
+const sarif_schema: []const u8 = "https://json.schemastore.org/sarif-2.1.0.json";
+
+/// Emits all diagnostics in SARIF format to the given writer.
+/// Supports version 2.1.0. Includes rule metadata if code is set.
+pub fn emitSarif(diagnostics: []const Diagnostic, writer: anytype) !void {
+    var buf_writer = json.writeStream(writer, .{});
+
+    try buf_writer.beginObject();
+
+    try buf_writer.objectField("version");
+    try buf_writer.write(sarif_version);
+
+    try buf_writer.objectField("$schema");
+    try buf_writer.write(sarif_schema);
+
+    try buf_writer.objectField("runs");
+    try buf_writer.beginArray();
+
+    try buf_writer.beginObject(); // runs[0]
+
+    try buf_writer.objectField("tool");
+    try buf_writer.beginObject(); // tool
+
+    try buf_writer.objectField("driver");
+    try buf_writer.beginObject(); // driver
+
+    try buf_writer.objectField("name");
+    try buf_writer.write("fehler");
+
+    try buf_writer.objectField("version");
+    try buf_writer.write("0.4.0");
+
+    try buf_writer.objectField("informationUri");
+    try buf_writer.write("https://github.com/ciathefed/fehler");
+
+    try buf_writer.objectField("rules");
+    try buf_writer.beginArray();
+
+    var seen_codes = std.ArrayList([]const u8).init(std.heap.page_allocator);
+    defer seen_codes.deinit();
+
+    for (diagnostics) |d| {
+        if (d.code) |code| {
+            var already_added = false;
+            for (seen_codes.items) |seen_code| {
+                if (std.mem.eql(u8, seen_code, code)) {
+                    already_added = true;
+                    break;
+                }
+            }
+
+            if (!already_added) {
+                try seen_codes.append(code);
+
+                try buf_writer.beginObject(); // rule
+
+                try buf_writer.objectField("id");
+                try buf_writer.write(code);
+
+                try buf_writer.objectField("shortDescription");
+                try buf_writer.beginObject(); // shortDescription
+
+                try buf_writer.objectField("text");
+                try buf_writer.write(d.message);
+
+                try buf_writer.endObject(); // shortDescription
+                try buf_writer.endObject(); // rule
+            }
+        }
+    }
+
+    try buf_writer.endArray(); // rules
+    try buf_writer.endObject(); // driver
+    try buf_writer.endObject(); // tool
+
+    try buf_writer.objectField("results");
+    try buf_writer.beginArray();
+
+    for (diagnostics) |d| {
+        try buf_writer.beginObject(); // result
+
+        try buf_writer.objectField("message");
+        try buf_writer.beginObject(); // message
+
+        try buf_writer.objectField("text");
+        try buf_writer.write(d.message);
+
+        try buf_writer.endObject(); // message
+
+        try buf_writer.objectField("level");
+        try buf_writer.write(sarifLevel(d.severity));
+
+        if (d.code) |code| {
+            try buf_writer.objectField("ruleId");
+            try buf_writer.write(code);
+        }
+
+        if (d.range) |r| {
+            try buf_writer.objectField("locations");
+            try buf_writer.beginArray();
+
+            try buf_writer.beginObject(); // location
+
+            try buf_writer.objectField("physicalLocation");
+            try buf_writer.beginObject(); // physicalLocation
+
+            try buf_writer.objectField("artifactLocation");
+            try buf_writer.beginObject(); // artifactLocation
+
+            try buf_writer.objectField("uri");
+            try buf_writer.write(r.file);
+
+            try buf_writer.endObject(); // artifactLocation
+
+            try buf_writer.objectField("region");
+            try buf_writer.beginObject(); // region
+
+            try buf_writer.objectField("startLine");
+            try buf_writer.write(r.start.line);
+
+            try buf_writer.objectField("startColumn");
+            try buf_writer.write(r.start.column);
+
+            try buf_writer.objectField("endLine");
+            try buf_writer.write(r.end.line);
+
+            try buf_writer.objectField("endColumn");
+            try buf_writer.write(r.end.column);
+
+            try buf_writer.endObject(); // region
+            try buf_writer.endObject(); // physicalLocation
+            try buf_writer.endObject(); // location
+
+            try buf_writer.endArray(); // locations
+        }
+
+        try buf_writer.endObject(); // result
+    }
+
+    try buf_writer.endArray(); // results
+    try buf_writer.endObject(); // runs[0]
+    try buf_writer.endArray(); // runs
+    try buf_writer.endObject(); // root
+}
+
+fn sarifLevel(severity: Severity) []const u8 {
+    return switch (severity) {
+        .fatal, .err => "error",
+        .warn => "warning",
+        .note => "note",
+        .todo, .unimplemented => "none",
+    };
+}
 
 /// Convenience function to create a diagnostic with single-character location information.
 pub fn createDiagnostic(
