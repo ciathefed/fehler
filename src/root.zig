@@ -1,3 +1,11 @@
+//! Fehler is a diagnostic reporting library for Zig.
+//!
+//! It provides rich, colorful compiler-style diagnostics with support for:
+//! - Source ranges and highlighting
+//! - Multiple output formats (`fehler`, `gcc`, `msvc`)
+//! - Fluent diagnostic construction
+//! - SARIF JSON export for CI/editor integration
+
 const std = @import("std");
 const print = std.debug.print;
 const json = std.json;
