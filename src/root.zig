@@ -2,7 +2,7 @@
 //!
 //! It provides rich, colorful compiler-style diagnostics with support for:
 //! - Source ranges and highlighting
-//! - Multiple output formats (`fehler`, `gcc`, `msvc`)
+//! - Multiple output formats (`Fehler`, `GCC`, `MSVC`)
 //! - Fluent diagnostic construction
 //! - SARIF JSON export for CI/editor integration
 
