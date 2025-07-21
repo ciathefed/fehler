@@ -201,7 +201,6 @@ pub const ErrorReporter = struct {
     }
 
     /// Returns a copy of this reporter with the specified output format.
-    /// Allows changing the format without breaking API compatibility.
     pub fn withFormat(self: ErrorReporter, format: OutputFormat) ErrorReporter {
         var reporter = self;
         reporter.format = format;
@@ -251,25 +250,14 @@ pub const ErrorReporter = struct {
         }
 
         if (diagnostic.range) |range| {
-            if (range.isMultiline()) {
-                print("  {s}{s}{s}:{}:{}{s}\n", .{
-                    Colors.cyan,
-                    Colors.bold,
-                    range.file,
-                    range.start.line,
-                    range.start.column,
-                    Colors.reset,
-                });
-            } else {
-                print("  {s}{s}{s}:{}:{}{s}\n", .{
-                    Colors.cyan,
-                    Colors.bold,
-                    range.file,
-                    range.start.line,
-                    range.start.column,
-                    Colors.reset,
-                });
-            }
+            print("  {s}{s}{s}:{}:{}{s}\n", .{
+                Colors.cyan,
+                Colors.bold,
+                range.file,
+                range.start.line,
+                range.start.column,
+                Colors.reset,
+            });
 
             const color = diagnostic.severity.color();
             self.printSourceSnippet(range, color) catch {};
