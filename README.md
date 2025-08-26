@@ -2,7 +2,7 @@
 
 A comprehensive error reporting system for Zig that provides rich, colorful diagnostic output similar to modern compilers like Rust's `rustc` and Zig's own compiler.
 
-![Static Badge](https://img.shields.io/badge/Zig-0.14.1-ec915c?style=flat-square&logo=zig)
+![Static Badge](https://img.shields.io/badge/Zig-0.15.1-ec915c?style=flat-square&logo=zig)
 ![Tests](https://img.shields.io/github/actions/workflow/status/ciathefed/fehler/zig.yml?label=Tests%20%F0%9F%A7%AA&style=flat-square)
 
 ## Features
