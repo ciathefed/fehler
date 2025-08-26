@@ -30,14 +30,23 @@ zig fetch --save "git+https://github.com/ciathefed/fehler#v0.6.0"
 zig fetch --save "git+https://github.com/ciathefed/fehler#main"
 ```
 
-Add this snippet to your `build.zig`:
+Add Fehler to your imports in `build.zig`:
 
 ```zig
 const fehler = b.dependency("fehler", .{
     .target = target,
     .optimize = optimize,
 });
-exe_mod.addImport("fehler", fehler.module("fehler"));
+
+const exe = b.addExecutable(.{
+    // ...
+    .root_module = b.createModule(.{
+        // ...
+        .imports = &.{
+            .{ .name = "fehler", .module = fehler.module("fehler") },
+        },
+    }),
+});
 ```
 
 ## Quick Start
