@@ -477,7 +477,7 @@ pub fn emitSarif(allocator: Allocator, diagnostics: []const Diagnostic, writer: 
     try buf_writer.write("fehler");
 
     try buf_writer.objectField("version");
-    try buf_writer.write("0.5.1");
+    try buf_writer.write("0.6.0");
 
     try buf_writer.objectField("informationUri");
     try buf_writer.write("https://github.com/ciathefed/fehler");
