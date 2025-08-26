@@ -2,7 +2,7 @@
     .name = .fehler,
     .version = "0.5.1",
     .fingerprint = 0x2763d78399d579f0,
-    .minimum_zig_version = "0.14.1",
+    .minimum_zig_version = "0.15.1",
     .dependencies = .{},
     .paths = .{
         "build.zig",
