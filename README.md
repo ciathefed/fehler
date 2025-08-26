@@ -30,7 +30,7 @@ zig fetch --save "git+https://github.com/ciathefed/fehler#v0.6.0"
 zig fetch --save "git+https://github.com/ciathefed/fehler#main"
 ```
 
-Add Fehler to your imports in `build.zig`:
+Add `fehler` to your imports in `build.zig`:
 
 ```zig
 const fehler = b.dependency("fehler", .{
