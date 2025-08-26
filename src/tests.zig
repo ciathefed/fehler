@@ -186,12 +186,7 @@ test "emitSarif outputs valid JSON with basic diagnostic" {
         .withCode("E001");
 
     var stream = std.io.Writer.fixed(&buffer);
-    try felher.emitSarif(
-        std.heap.page_allocator,
-        256,
-        &[_]Diagnostic{ diag1, diag2 },
-        &stream,
-    );
+    try felher.emitSarif(std.heap.page_allocator, &[_]Diagnostic{ diag1, diag2 }, &stream);
 
     const json = buffer[0..stream.end];
     try testing.expect(std.mem.indexOf(u8, json, "\"message\"") != null);
