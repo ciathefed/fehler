@@ -210,7 +210,7 @@ pub const ErrorReporter = struct {
     /// Adds a source file to the reporter for later reference in diagnostics.
     /// The content is duplicated and owned by the reporter.
     pub fn addSource(self: *ErrorReporter, filename: []const u8, content: []const u8) !void {
-        try self.sources.ensureTotalCapacity(self.sources.count() + 1);
+        try self.sources.ensureUnusedCapacity(1);
         const owned_content = try self.allocator.dupe(u8, content);
         errdefer comptime unreachable;
 
