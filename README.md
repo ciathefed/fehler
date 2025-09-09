@@ -37,16 +37,7 @@ const fehler = b.dependency("fehler", .{
     .target = target,
     .optimize = optimize,
 });
-
-const exe = b.addExecutable(.{
-    // ...
-    .root_module = b.createModule(.{
-        // ...
-        .imports = &.{
-            .{ .name = "fehler", .module = fehler.module("fehler") },
-        },
-    }),
-});
+exe.root_module.addImport("fehler", fehler.module("fehler"));
 ```
 
 ## Quick Start
