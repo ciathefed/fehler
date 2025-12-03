@@ -1,0 +1,20 @@
+name: Zig
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+
+jobs:
+  test:
+    runs-on: codeberg-tiny
+    name: Build and Test
+    steps:
+      - uses: actions/checkout@v3
+      - uses: https://codeberg.org/mlugg/setup-zig@v2
+        with:
+          version: 0.15.1
+
+      - name: "Run the tests."
+        run: zig test src/tests.zig
