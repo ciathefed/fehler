@@ -116,12 +116,12 @@ reporter.report(diagnostic);
 
 Represents the severity level of a diagnostic:
 
-* `.fatal` - Fatal error, unrecoverable internal error (red)
-* `.err` - Error (red)
-* `.warn` - Warning (yellow)
-* `.note` - Note/info (blue)
-* `.todo` - To-do reminder, incomplete feature (magenta)
-* `.unimplemented` - Feature not implemented (cyan)
+- `.fatal` - Fatal error, unrecoverable internal error (red)
+- `.err` - Error (red)
+- `.warn` - Warning (yellow)
+- `.note` - Note/info (blue)
+- `.todo` - To-do reminder, incomplete feature (magenta)
+- `.unimplemented` - Feature not implemented (cyan)
 
 ```zig
 const severity = Severity.err;
@@ -280,21 +280,21 @@ The diagnostic system uses different visual indicators based on the range:
 
 ### Single Character (Caret `^`)
 
-```
+```zig
    5 |     const y = x + "hello";
      |               ^
 ```
 
 ### Single Line Range (Tildes `~`)
 
-```
+```zig
    5 |     const very_long_variable_name = 42;
      |           ~~~~~~~~~~~~~~~~~~~~~~~
 ```
 
 ### Multi-line Range (Tildes `~`)
 
-```
+```zig
    5 |     const result = calculate(
      |                    ~~~~~~~~~
    6 |         param1,
@@ -318,9 +318,9 @@ To contribute code:
 
 Please follow the [Conventional Commits](https://www.conventionalcommits.org/) format for commit messages. Examples:
 
-* `fix: handle empty source input in reporter`
-* `feat: add support for range-based highlighting`
-* `refactor: simplify diagnostic builder`
+- `fix: handle empty source input in reporter`
+- `feat: add support for range-based highlighting`
+- `refactor: simplify diagnostic builder`
 
 Keep changes focused and minimal. Include tests when appropriate.
 
