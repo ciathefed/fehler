@@ -1,4 +1,7 @@
 .zig-cache/
 zig-out/
 *.o
+*.a
 .DS_Store
+.vscode
+docs

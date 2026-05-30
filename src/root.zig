@@ -454,7 +454,7 @@ const sarif_schema: []const u8 = "https://json.schemastore.org/sarif-2.1.0.json"
 
 /// Emits all diagnostics in SARIF format to the given writer.
 /// Supports version 2.1.0. Includes rule metadata if code is set.
-pub fn emitSarif(allocator: Allocator, diagnostics: []const Diagnostic, writer: *std.io.Writer) !void {
+pub fn emitSarif(allocator: Allocator, diagnostics: []const Diagnostic, writer: *std.Io.Writer) !void {
     var buf_writer = json.Stringify{ .writer = writer };
 
     try buf_writer.beginObject();
@@ -488,8 +488,8 @@ pub fn emitSarif(allocator: Allocator, diagnostics: []const Diagnostic, writer: 
     try buf_writer.objectField("rules");
     try buf_writer.beginArray();
 
-    var seen_codes = std.array_list.Managed([]const u8).init(allocator);
-    defer seen_codes.deinit();
+    var seen_codes: std.ArrayList([]const u8) = .empty;
+    defer seen_codes.deinit(allocator);
 
     for (diagnostics) |d| {
         if (d.code) |code| {
@@ -502,7 +502,7 @@ pub fn emitSarif(allocator: Allocator, diagnostics: []const Diagnostic, writer: 
             }
 
             if (!already_added) {
-                try seen_codes.append(code);
+                try seen_codes.append(allocator, code);
 
                 try buf_writer.beginObject(); // rule
 
